@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>소셜 로그인 테스트</title>
+    <title>소셜 로그인 테스트 (리디렉션 방식)</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
@@ -19,14 +19,14 @@
 
         <!-- 로그인 전 화면 -->
         <div id="login-section" class="space-y-4">
-            <!-- 구글 로그인 버튼 -->
-            <button onclick="handleGoogleLogin()" class="w-full py-3 px-4 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-xl border border-gray-300 shadow-2xs flex items-center justify-center space-x-3 active:scale-95 transition-all text-xs">
+            <!-- 구글 로그인 버튼 (팝업 대신 화면 전환 리디렉션 방식 적용) -->
+            <button onclick="handleGoogleLogin()" id="google-login-btn" class="w-full py-3 px-4 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-xl border border-gray-300 shadow-2xs flex items-center justify-center space-x-3 active:scale-95 transition-all text-xs">
                 <i class="fa-brands fa-google text-rose-500 text-sm"></i>
                 <span>구글 계정으로 로그인</span>
             </button>
 
-            <!-- 카카오 로그인 버튼 (카카오 공식 스타일 컬러) -->
-            <button onclick="handleKakaoLogin()" class="w-full py-3 px-4 bg-[#FEE500] hover:fainter hover:bg-[#fdd800] text-[#191919] font-bold rounded-xl shadow-2xs flex items-center justify-center space-x-3 active:scale-95 transition-all text-xs">
+            <!-- 카카오 로그인 버튼 (추후 연동용) -->
+            <button onclick="handleKakaoLogin()" class="w-full py-3 px-4 bg-[#FEE500] hover:bg-[#fdd800] text-[#191919] font-bold rounded-xl shadow-2xs flex items-center justify-center space-x-3 active:scale-95 transition-all text-xs">
                 <i class="fa-solid fa-comment text-sm"></i>
                 <span>카카오 계정으로 로그인</span>
             </button>
@@ -60,7 +60,8 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
             getAuth, 
-            signInWithPopup, 
+            signInWithRedirect, 
+            getRedirectResult,
             GoogleAuthProvider, 
             OAuthProvider, 
             setPersistence, 
@@ -70,40 +71,47 @@
             signOut 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // 사용중이신 기존 Firebase 설정 정보 연결
+        // 사용중이신 기존 테스트용 Firebase 설정 정보
         const firebaseConfig = {
-  	apiKey: "AIzaSyD3R4-0_BgOvpS9b1NRgD7uKaYYZjFZ5cY",
-  	authDomain: "msoo-test.firebaseapp.com",
- 	 projectId: "msoo-test",
- 	 storageBucket: "msoo-test.firebasestorage.app",
-	  messagingSenderId: "790925552449",
-	  appId: "1:790925552449:web:d078bfd7d3e3e4684d4fc0"
-	};
+            apiKey: "AIzaSyD3R4-0_BgOvpS9b1NRgD7uKaYYZjFZ5cY",
+            authDomain: "msoo-test.firebaseapp.com",
+            projectId: "msoo-test",
+            storageBucket: "msoo-test.firebasestorage.app",
+            messagingSenderId: "790925552449",
+            appId: "1:790925552449:web:d078bfd7d3e3e4684d4fc0"
+        };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const googleProvider = new GoogleAuthProvider();
-        
-        // 카카오는 Firebase에서 표준 OIDC(OpenID Connect) 공급자인 OAuthProvider('oidc.kakao')를 통해 연동합니다.
         const kakaoProvider = new OAuthProvider('oidc.kakao');
 
         // [핵심] 로그인 상태 유지 체크박스 연동 함수
         async function applyPersistenceSetting() {
             const isAutoLogin = document.getElementById('auto-login-check').checked;
-            // 체크되어 있으면 Local(영구 유지), 아니면 Session(브라우저 닫으면 풀림) 설정
             const persistenceType = isAutoLogin ? browserLocalPersistence : browserSessionPersistence;
             await setPersistence(auth, persistenceType);
         }
 
-        // 구글 로그인 실행 함수
+        // 구글 로그인 실행 함수 (팝업 대신 페이지 전환 리디렉션 방식 적용)
         window.handleGoogleLogin = async function() {
             try {
+                const btn = document.getElementById('google-login-btn');
+                if (btn) {
+                    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-emerald-600 text-sm"></i><span>구글 로그인 페이지로 이동 중...</span>`;
+                    btn.disabled = true;
+                }
                 await applyPersistenceSetting();
-                const result = await signInWithPopup(auth, googleProvider);
-                console.log("구글 로그인 성공:", result.user);
+                // 팝업창 대신 현재 브라우저 창이 구글 로그인 화면으로 자연스럽게 전환됩니다.
+                await signInWithRedirect(auth, googleProvider);
             } catch (error) {
                 console.error("구글 로그인 에러:", error);
                 alert("구글 로그인 실패: " + error.message);
+                const btn = document.getElementById('google-login-btn');
+                if (btn) {
+                    btn.innerHTML = `<i class="fa-brands fa-google text-rose-500 text-sm"></i><span>구글 계정으로 로그인</span>`;
+                    btn.disabled = false;
+                }
             }
         };
 
@@ -111,11 +119,10 @@
         window.handleKakaoLogin = async function() {
             try {
                 await applyPersistenceSetting();
-                const result = await signInWithPopup(auth, kakaoProvider);
-                console.log("카카오 로그인 성공:", result.user);
+                await signInWithRedirect(auth, kakaoProvider);
             } catch (error) {
                 console.error("카카오 로그인 에러:", error);
-                alert("카카오 로그인 실패 (Firebase 콘솔에서 카카오 OIDC 공급자 설정이 필요할 수 있습니다): " + error.message);
+                alert("카카오 로그인 실패: " + error.message);
             }
         };
 
@@ -128,6 +135,16 @@
                 console.error("로그아웃 에러:", error);
             }
         };
+
+        // 페이지가 리디렉션되어 돌아왔을 때 로그인 결과 확인 처리
+        getRedirectResult(auth)
+            .then((result) => {
+                if (result && result.user) {
+                    console.log("리디렉션 로그인 성공:", result.user);
+                }
+            }).catch((error) => {
+                console.error("리디렉션 결과 처리 에러:", error);
+            });
 
         // 실시간 인증 상태 감지 (자동 로그인 및 UI 전환 처리)
         onAuthStateChanged(auth, (user) => {
